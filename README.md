@@ -99,6 +99,16 @@ python main.py
 
 Ce script est à usage éducatif uniquement. Utilisation à vos risques et périls.
 
+## Bonus😈
+jouez sur un PC pour plus de stabilité 
+et de performance et éviter de jouer en leader en classé surtout à partir du légendaire, mode de jeu conseillé: 
+survivant solo; personne pourra vous 
+signalez 🤫
+
+surtout aller troll vos amis 👹
+(c'est le diable ou quoi💀)
+ayez la ref au moins svp🔥
+
 ## Licence
 
 MIT
