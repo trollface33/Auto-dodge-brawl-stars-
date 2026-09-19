@@ -1,9 +1,8 @@
 """
 Module de détection des attaques pour Brawl Stars Auto Dodge.
 
-La détection est volontairement conservatrice : une couleur rouge/jaune seule
-ne suffit pas. Il faut une forme suffisamment grande, située dans la zone de jeu
-et proche du joueur. Un délai entre deux détections empêche les esquives en boucle.
+La détection filtre les éléments de l'interface et choisit une esquive
+opposée à la menace détectée.
 """
 
 import logging
@@ -23,9 +22,9 @@ class DodgeDetector:
         self,
         sensitivity=0.7,
         threshold=0.85,
-        dodge_range=150,
-        min_contour_area=80,
-        cooldown_seconds=0.8,
+        dodge_range=280,
+        min_contour_area=50,
+        cooldown_seconds=0.35,
     ):
         self.sensitivity = max(0.0, min(1.0, float(sensitivity)))
         self.threshold = max(0.0, min(1.0, float(threshold)))
@@ -52,7 +51,7 @@ class DodgeDetector:
         raise ValueError(f"Nombre de canaux non supporté : {frame.shape[2]}")
 
     def detect_incoming_attack(self, frame, player_position=None):
-        """Retourne True seulement si une menace crédible est proche du joueur."""
+        """Retourne True si une menace crédible est proche du joueur."""
         try:
             now = time.monotonic()
             if now - self.last_detection_time < self.cooldown_seconds:
@@ -62,9 +61,9 @@ class DodgeDetector:
             height, width = image.shape[:2]
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-            # Ignore les bords de l'écran, où se trouvent souvent les éléments HUD.
+            # Zone de jeu : on ignore davantage les barres et boutons du HUD.
             x0, x1 = int(width * 0.08), int(width * 0.92)
-            y0, y1 = int(height * 0.12), int(height * 0.90)
+            y0, y1 = int(height * 0.10), int(height * 0.92)
             roi = hsv[y0:y1, x0:x1]
 
             red1 = cv2.inRange(roi, np.array([0, 130, 110]), np.array([10, 255, 255]))
@@ -84,33 +83,34 @@ class DodgeDetector:
                 area = cv2.contourArea(contour)
                 if area < self.min_contour_area:
                     continue
-                bx, by, bw, bh = cv2.boundingRect(contour)
-                if bw < 6 or bh < 6:
+                _, _, bw, bh = cv2.boundingRect(contour)
+                if bw < 5 or bh < 5:
                     continue
                 moments = cv2.moments(contour)
                 if moments["m00"] == 0:
                     continue
+
                 cx = int(moments["m10"] / moments["m00"]) + x0
                 cy = int(moments["m01"] / moments["m00"]) + y0
                 distance = float(np.hypot(cx - player_x, cy - player_y))
-                max_distance = max(width, height) * 0.42
+                max_distance = max(width, height) * 0.48
                 if distance > max_distance:
                     continue
 
-                # Les grandes formes proches sont plus crédibles qu'une petite
-                # tache de couleur. La sensibilité ne supprime jamais les filtres.
-                score = min(1.0, area / 1200.0) * (1.0 - distance / max_distance)
+                score = min(1.0, area / 900.0) * (1.0 - distance / max_distance)
                 if best is None or score > best[0]:
                     best = (score, cx, cy)
 
-            required_score = max(0.10, self.threshold * 0.25)
+            # Seuil plus permissif pour réagir plus souvent, tout en gardant
+            # les filtres de taille, distance et couleur.
+            required_score = max(0.07, self.threshold * 0.18)
             if best is None or best[0] < required_score:
                 return False
 
             self.last_attack_position = (best[1], best[2])
             self.last_detection_time = now
             logger.info(
-                "Menace crédible détectée en (%d, %d), score=%.2f",
+                "Menace détectée en (%d, %d), score=%.2f",
                 best[1], best[2], best[0],
             )
             return True
@@ -119,7 +119,7 @@ class DodgeDetector:
             return False
 
     def calculate_dodge_position(self, frame, player_position):
-        """Calcule une esquive opposée à la menace, sans position aléatoire."""
+        """Calcule une esquive plus longue, opposée à la menace."""
         image = self._to_numpy(frame)
         height, width = image.shape[:2]
         player_x, player_y = player_position

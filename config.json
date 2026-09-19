@@ -1,14 +1,14 @@
 {
   "device_id": "emulator-5554",
   "sensitivity": 0.7,
-  "dodge_delay_ms": 50,
+  "dodge_delay_ms": 35,
   "screen_width": 1080,
   "screen_height": 2340,
   "detection_method": "image_recognition",
   "log_level": "INFO",
   "enable_logging": true,
-  "dodge_range": 150,
+  "dodge_range": 280,
   "attack_detection_threshold": 0.85,
-  "min_contour_area": 80,
-  "detection_cooldown_seconds": 0.8
+  "min_contour_area": 50,
+  "detection_cooldown_seconds": 0.35
 }
