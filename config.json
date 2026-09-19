@@ -8,5 +8,7 @@
   "log_level": "INFO",
   "enable_logging": true,
   "dodge_range": 150,
-  "attack_detection_threshold": 0.85
+  "attack_detection_threshold": 0.85,
+  "min_contour_area": 80,
+  "detection_cooldown_seconds": 0.8
 }
