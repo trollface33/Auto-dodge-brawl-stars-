@@ -41,15 +41,15 @@ def main():
     detector = DodgeDetector(
         sensitivity=config.get("sensitivity", 0.7),
         threshold=config.get("attack_detection_threshold", 0.85),
-        dodge_range=config.get("dodge_range", 280),
-        min_contour_area=config.get("min_contour_area", 50),
-        cooldown_seconds=config.get("detection_cooldown_seconds", 0.35),
-        min_motion_pixels=config.get("min_motion_pixels", 3),
-        max_tracking_jump=config.get("max_tracking_jump", 220),
+        dodge_range=config.get("dodge_range", 320),
+        min_contour_area=config.get("min_contour_area", 30),
+        cooldown_seconds=config.get("detection_cooldown_seconds", 0.2),
+        min_motion_pixels=config.get("min_motion_pixels", 2),
+        max_tracking_jump=config.get("max_tracking_jump", 260),
     )
     controller = DodgeController(
         device_id=config.get("device_id", ""),
-        dodge_delay_ms=config.get("dodge_delay_ms", 35),
+        dodge_delay_ms=config.get("dodge_delay_ms", 25),
     )
 
     logger.info("=== Brawl Stars Auto Dodge ===")
@@ -77,6 +77,7 @@ def main():
                 logger.info(f"Esquive latérale vers {dodge_position}")
                 if controller.dodge(player_position, dodge_position):
                     dodge_count += 1
+                    detector.reset_after_dodge()
 
             if frame_count % 100 == 0:
                 elapsed = max(0.001, time.time() - start_time)

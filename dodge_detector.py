@@ -36,6 +36,12 @@ class DodgeDetector:
         self.last_detection_time = 0.0
         self.previous_candidates = []
 
+    def reset_after_dodge(self):
+        """Permet une nouvelle détection immédiatement après une esquive."""
+        self.last_detection_time = 0.0
+        self.previous_candidates = []
+        self.last_attack_position = None
+
     @staticmethod
     def _to_numpy(frame):
         if isinstance(frame, Image.Image):
@@ -110,8 +116,6 @@ class DodgeDetector:
                         nearest = previous
                         nearest_distance = jump
 
-                # Sans position précédente, impossible de distinguer un décor
-                # fixe d'un projectile : on attend l'image suivante.
                 if nearest is None:
                     continue
 
@@ -122,7 +126,6 @@ class DodgeDetector:
                 if motion < self.min_motion_pixels or approaching < self.min_motion_pixels:
                     continue
 
-                # Le vecteur de mouvement doit pointer globalement vers le joueur.
                 to_player = np.array([player[0] - cx, player[1] - cy], dtype=float)
                 movement = np.array([motion_x, motion_y], dtype=float)
                 alignment = float(np.dot(movement, to_player)) / max(
@@ -166,7 +169,6 @@ class DodgeDetector:
         dx = player_x - attack[0]
         dy = player_y - attack[1]
         if abs(dx) >= abs(dy):
-            # Projectile à droite => dx négatif => déplacement à gauche.
             dodge_x = player_x + (self.dodge_range if dx > 0 else -self.dodge_range)
             dodge_y = player_y
         else:
