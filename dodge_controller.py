@@ -1,163 +1,140 @@
 """
-Module de contrôle des mouvements d'esquive pour Brawl Stars
+Module de contrôle des mouvements d'esquive pour Brawl Stars via ADB USB.
 """
 
+import io
 import logging
 import time
-from adb_shell.adb_device import AdbDeviceTcp
+
+from adb_shell.adb_device import AdbDeviceUsb
 from PIL import Image
-import io
 
 logger = logging.getLogger(__name__)
 
 
 class DodgeController:
-    """Contrôle les mouvements d'esquive via ADB"""
-    
-    def __init__(self, device_id="emulator-5554", dodge_delay_ms=50):
+    """Contrôle les mouvements d'esquive via ADB USB."""
+
+    def __init__(self, device_id="", dodge_delay_ms=50):
         """
-        Initialise le contrôleur d'esquive
-        
+        Initialise le contrôleur.
+
         Args:
-            device_id: ID du device ADB
-            dodge_delay_ms: Délai avant esquive en millisecondes
+            device_id: Numéro de série affiché par `adb devices`.
+            dodge_delay_ms: Délai avant l'esquive, en millisecondes.
         """
         self.device_id = device_id
-        self.dodge_delay_ms = dodge_delay_ms / 1000.0  # Convertir en secondes
+        self.dodge_delay_ms = dodge_delay_ms / 1000.0
         self.device = None
         self.player_position = None
         self.is_connected = False
-        
+
     def connect(self):
-        """Établit la connexion avec le device ADB"""
+        """Établit une connexion avec le téléphone Android en USB."""
         try:
-            # Se connecter au device
-            host, port = self.device_id.split(":")[-1], 5037
-            self.device = AdbDeviceTcp(self.device_id)
+            if not self.device_id:
+                logger.error(
+                    "Aucun device_id configuré. Utilise le numéro affiché par `adb devices`."
+                )
+                return False
+
+            # Pour un téléphone branché en USB, il faut utiliser AdbDeviceUsb.
+            # Ne pas utiliser AdbDeviceTcp, qui sert aux appareils accessibles en réseau.
+            self.device = AdbDeviceUsb(serial=self.device_id)
             self.device.connect()
             self.is_connected = True
-            logger.info(f"Connecté au device: {self.device_id}")
+            logger.info(f"Connecté au device USB : {self.device_id}")
             return True
         except Exception as e:
-            logger.error(f"Erreur de connexion ADB: {e}")
+            self.is_connected = False
+            logger.error(f"Erreur de connexion ADB USB : {e}")
+            logger.error(
+                "Vérifie `adb devices`, le débogage USB et l'autorisation sur le téléphone."
+            )
             return False
-    
+
     def disconnect(self):
-        """Ferme la connexion avec le device"""
+        """Ferme la connexion avec le device."""
         if self.device:
             try:
                 self.device.close()
+            except Exception as e:
+                logger.error(f"Erreur de déconnexion : {e}")
+            finally:
+                self.device = None
                 self.is_connected = False
                 logger.info("Déconnecté du device")
-            except Exception as e:
-                logger.error(f"Erreur de déconnexion: {e}")
-    
+
     def get_screenshot(self):
-        """
-        Capture l'écran du device
-        
-        Returns:
-            PIL.Image: Capture d'écran
-        """
+        """Capture l'écran du device et retourne une image PIL."""
         try:
-            if not self.is_connected:
+            if not self.is_connected or self.device is None:
                 logger.warning("Device non connecté")
                 return None
-            
-            # Utiliser screencap
+
             result = self.device.shell("screencap -p")
-            image = Image.open(io.BytesIO(result))
-            return image
+            if isinstance(result, str):
+                result = result.encode()
+            return Image.open(io.BytesIO(result)).convert("RGB")
         except Exception as e:
-            logger.error(f"Erreur lors de la capture: {e}")
+            logger.error(f"Erreur lors de la capture : {e}")
             return None
-    
+
     def tap(self, x, y):
-        """
-        Effectue un tap à la position (x, y)
-        
-        Args:
-            x: Coordonnée X
-            y: Coordonnée Y
-        """
+        """Effectue un tap à la position (x, y)."""
         try:
-            if not self.is_connected:
+            if not self.is_connected or self.device is None:
                 logger.warning("Device non connecté")
                 return False
-            
-            self.device.shell(f"input tap {x} {y}")
+
+            self.device.shell(f"input tap {int(x)} {int(y)}")
             logger.debug(f"Tap effectué à ({x}, {y})")
             return True
         except Exception as e:
-            logger.error(f"Erreur lors du tap: {e}")
+            logger.error(f"Erreur lors du tap : {e}")
             return False
-    
+
     def swipe(self, start_x, start_y, end_x, end_y, duration_ms=500):
-        """
-        Effectue un swipe du point de départ au point d'arrivée
-        
-        Args:
-            start_x: X initial
-            start_y: Y initial
-            end_x: X final
-            end_y: Y final
-            duration_ms: Durée du swipe en millisecondes
-        """
+        """Effectue un swipe entre deux positions."""
         try:
-            if not self.is_connected:
+            if not self.is_connected or self.device is None:
                 logger.warning("Device non connecté")
                 return False
-            
-            self.device.shell(f"input swipe {start_x} {start_y} {end_x} {end_y} {duration_ms}")
-            logger.debug(f"Swipe effectué de ({start_x}, {start_y}) à ({end_x}, {end_y})")
+
+            command = (
+                f"input swipe {int(start_x)} {int(start_y)} "
+                f"{int(end_x)} {int(end_y)} {int(duration_ms)}"
+            )
+            self.device.shell(command)
+            logger.debug(
+                f"Swipe effectué de ({start_x}, {start_y}) "
+                f"à ({end_x}, {end_y})"
+            )
             return True
         except Exception as e:
-            logger.error(f"Erreur lors du swipe: {e}")
+            logger.error(f"Erreur lors du swipe : {e}")
             return False
-    
+
     def dodge(self, current_position, dodge_position):
-        """
-        Effectue une esquive vers la position spécifiée
-        
-        Args:
-            current_position: Position actuelle (x, y)
-            dodge_position: Position d'esquive cible (x, y)
-        """
+        """Effectue une esquive vers la position indiquée."""
         try:
-            # Attendre le délai configuré
             time.sleep(self.dodge_delay_ms)
-            
-            # Effectuer un swipe rapide vers la position d'esquive
-            self.swipe(
+            return self.swipe(
                 current_position[0],
                 current_position[1],
                 dodge_position[0],
                 dodge_position[1],
-                duration_ms=200
+                duration_ms=200,
             )
-            
-            logger.info(f"Esquive effectuée vers {dodge_position}")
-            return True
         except Exception as e:
-            logger.error(f"Erreur lors de l'esquive: {e}")
+            logger.error(f"Erreur lors de l'esquive : {e}")
             return False
-    
+
     def update_player_position(self, x, y):
-        """
-        Met à jour la position du joueur
-        
-        Args:
-            x: Coordonnée X
-            y: Coordonnée Y
-        """
+        """Met à jour la position du joueur."""
         self.player_position = (x, y)
-        logger.debug(f"Position du joueur mise à jour: {self.player_position}")
-    
+        logger.debug(f"Position du joueur mise à jour : {self.player_position}")
+
     def get_player_position(self):
-        """
-        Récupère la position actuelle du joueur
-        
-        Returns:
-            tuple: Position (x, y)
-        """
+        """Retourne la position actuelle du joueur."""
         return self.player_position if self.player_position else (0, 0)
