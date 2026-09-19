@@ -10,5 +10,7 @@
   "dodge_range": 280,
   "attack_detection_threshold": 0.85,
   "min_contour_area": 50,
-  "detection_cooldown_seconds": 0.35
+  "detection_cooldown_seconds": 0.35,
+  "min_motion_pixels": 3,
+  "max_tracking_jump": 220
 }

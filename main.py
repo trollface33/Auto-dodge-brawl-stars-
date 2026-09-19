@@ -10,19 +10,14 @@ import time
 from dodge_controller import DodgeController
 from dodge_detector import DodgeDetector
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def load_config(config_file="config.json"):
     try:
         with open(config_file, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        logger.info(f"Configuration chargée depuis {config_file}")
-        return config
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logger.error(f"Configuration invalide ({config_file}) : {e}")
         return {}
@@ -30,11 +25,10 @@ def load_config(config_file="config.json"):
 
 def main():
     parser = argparse.ArgumentParser(description="Brawl Stars Auto Dodge")
-    parser.add_argument("--device", type=str, help="ID du device ADB")
-    parser.add_argument("--sensitivity", type=float, help="Sensibilité (0.0-1.0)")
-    parser.add_argument("--config", default="config.json", help="Fichier de configuration")
+    parser.add_argument("--device", type=str)
+    parser.add_argument("--sensitivity", type=float)
+    parser.add_argument("--config", default="config.json")
     args = parser.parse_args()
-
     config = load_config(args.config)
     if args.device:
         config["device_id"] = args.device
@@ -47,19 +41,19 @@ def main():
     detector = DodgeDetector(
         sensitivity=config.get("sensitivity", 0.7),
         threshold=config.get("attack_detection_threshold", 0.85),
-        dodge_range=config.get("dodge_range", 150),
-        min_contour_area=config.get("min_contour_area", 80),
-        cooldown_seconds=config.get("detection_cooldown_seconds", 0.8),
+        dodge_range=config.get("dodge_range", 280),
+        min_contour_area=config.get("min_contour_area", 50),
+        cooldown_seconds=config.get("detection_cooldown_seconds", 0.35),
+        min_motion_pixels=config.get("min_motion_pixels", 3),
+        max_tracking_jump=config.get("max_tracking_jump", 220),
     )
     controller = DodgeController(
         device_id=config.get("device_id", ""),
-        dodge_delay_ms=config.get("dodge_delay_ms", 50),
+        dodge_delay_ms=config.get("dodge_delay_ms", 35),
     )
 
     logger.info("=== Brawl Stars Auto Dodge ===")
     logger.info(f"Device: {config.get('device_id')}")
-    logger.info(f"Sensibilité: {config.get('sensitivity')}")
-
     if not controller.connect():
         logger.error("Impossible de se connecter au device")
         return
@@ -68,30 +62,25 @@ def main():
     frame_count = 0
     dodge_count = 0
     start_time = time.time()
-
     try:
         while True:
             screenshot = controller.get_screenshot()
             if screenshot is None:
                 time.sleep(1)
                 continue
-
             frame_count += 1
             player_position = (screenshot.width // 2, screenshot.height // 2)
             controller.update_player_position(*player_position)
 
             if detector.detect_incoming_attack(screenshot, player_position):
                 dodge_position = detector.calculate_dodge_position(screenshot, player_position)
-                logger.info(f"Esquive contrôlée vers {dodge_position}")
+                logger.info(f"Esquive latérale vers {dodge_position}")
                 if controller.dodge(player_position, dodge_position):
                     dodge_count += 1
 
             if frame_count % 100 == 0:
                 elapsed = max(0.001, time.time() - start_time)
-                logger.info(
-                    f"Stats - FPS: {frame_count / elapsed:.1f}, "
-                    f"Esquives: {dodge_count}, Frames: {frame_count}"
-                )
+                logger.info(f"Stats - FPS: {frame_count / elapsed:.1f}, Esquives: {dodge_count}, Frames: {frame_count}")
             time.sleep(0.1)
     except KeyboardInterrupt:
         logger.info("Arrêt demandé par l'utilisateur")
@@ -99,10 +88,7 @@ def main():
         logger.error(f"Erreur: {e}", exc_info=True)
     finally:
         controller.disconnect()
-        logger.info(
-            f"=== Session terminée === Durée: {time.time() - start_time:.1f}s | "
-            f"Esquives: {dodge_count} | Frames: {frame_count}"
-        )
+        logger.info(f"=== Session terminée === Durée: {time.time() - start_time:.1f}s | Esquives: {dodge_count} | Frames: {frame_count}")
 
 
 if __name__ == "__main__":
